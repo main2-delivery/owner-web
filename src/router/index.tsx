@@ -1,20 +1,10 @@
-import { createBrowserRouter } from 'react-router'
-import Layout from '../components/layout/Layout'
-import OrderListPage from '../pages/order/OrderListPage'
-import MenuListPage from '../pages/menu/MenuListPage'
-import ReviewListPage from '../pages/review/ReviewListPage'
-import StorePage from '../pages/store/StorePage'
+import { createBrowserRouter, Navigate } from 'react-router'
+import LoginPage from '../pages/auth/LoginPage'
+import OrderBoardPage from '../pages/order/OrderBoardPage'
 
 export const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <Layout />,
-    children: [
-      { index: true, element: <OrderListPage /> },
-      { path: 'orders', element: <OrderListPage /> },
-      { path: 'menus', element: <MenuListPage /> },
-      { path: 'reviews', element: <ReviewListPage /> },
-      { path: 'store', element: <StorePage /> },
-    ],
-  },
+  { path: '/', element: <Navigate to="/login" replace /> },
+  { path: '/login', element: <LoginPage /> },
+  { path: '/orders', element: <OrderBoardPage /> },
+  { path: '*', element: <Navigate to="/" replace /> },
 ])

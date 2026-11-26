@@ -23,25 +23,39 @@
 ## 로그인 없이 테스트하기
 `.env.local`의 `VITE_TEST_USER_ID`, `VITE_TEST_ROLE` 값이 백엔드의 `X-Test-User-Id`, `X-Test-Role` 헤더로 자동으로 붙는다.
 
+## 화면
+디자인: Figma `점주 웹` 페이지 (OWN-01 ~ OWN-11)
+
+| 경로 | 화면 | 디자인 |
+|---|---|---|
+| `/login` | 로그인 | OWN-01 |
+| `/orders` | 주문판 (신규 팝업, 접수, 거절, 조리, 픽업, 영업 상태, 로그아웃) | OWN-02 ~ OWN-11 |
+
+주문판 상태 탭과 백엔드 `OrderStatus` 매핑은 `src/constants/order.ts`에 있다.
+지금은 `src/mocks/` 목업 데이터로 동작한다. 백엔드 연동 시 `hooks/order/useOrderBoard.ts`의 각 동작을 `api/order` 호출로 바꾼다.
+
 ## 폴더 규칙
 백엔드처럼 계층 먼저, 그 안에서 기능 폴더로 나눈다.
-기능: `order`(주문), `menu`(메뉴), `review`(리뷰), `store`(가게), `image`(이미지 업로드)
+기능: `auth`(로그인), `order`(주문판), `store`(가게·영업 상태), `menu`, `review`, `image`
 
 ```
 src/
-├── api/        서버 호출 함수          api/order/orderApi.ts
-├── hooks/      화면에서 쓰는 훅         hooks/order/useOrders.ts
-├── pages/      라우트 하나당 화면 하나   pages/order/OrderListPage.tsx
-├── components/ 화면 조각               components/order/OrderCard.tsx
-│   ├── common/   여러 기능이 함께 쓰는 버튼·모달 등
-│   └── layout/   공통 레이아웃(사이드바)
-├── types/      요청·응답 타입           types/order.ts, common.ts(백엔드 enum)
+├── api/        서버 호출 함수            api/order/orderApi.ts
+├── hooks/      화면에서 쓰는 훅           hooks/order/useOrderBoard.ts
+├── pages/      라우트 하나당 화면 하나     pages/order/OrderBoardPage.tsx
+├── components/ 화면 조각                 components/order/OrderDetail.tsx
+│   ├── common/   버튼·상태 칩·모달·토스트 등 공통 부품
+│   └── layout/   상단 바, 띠 배너, 로그아웃 모달
+├── constants/  상태 탭, 거절 사유 등 고정 값
+├── mocks/      백엔드 연동 전 목업 데이터
+├── types/      요청·응답 타입              types/order.ts, common.ts(백엔드 enum)
 ├── router/     라우트 목록
-├── styles/     전역 CSS
-└── utils/      날짜·금액 포맷 등
+├── styles/     전역 CSS (색상 변수 포함)
+└── utils/      금액·시간 포맷 등
 ```
 - 타입 이름·enum 값은 백엔드 DTO와 맞춘다 (`types/common.ts`의 `OrderStatus`, `Role`).
 - 새 화면은 `pages/기능/`에 만들고 `router/index.tsx`에 등록한다.
+- 컴포넌트 이름은 Figma `Components(점주)`의 이름을 따른다 (예: `점주/주문서 상세` → `OrderDetail`).
 
 ## 브랜치
 `main`에는 PR로만 반영한다. 작업 브랜치 이름은 `feature/번호-설명` 또는 `feature/설명` (예: `feature/33-order-list`, `feature/order-list`).
