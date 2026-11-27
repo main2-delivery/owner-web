@@ -1,8 +1,5 @@
-import { useCallback, useState } from 'react'
-import { useNavigate } from 'react-router'
-import TopBar from '../../components/layout/TopBar'
+import { useCallback, useEffect, useState } from 'react'
 import Banner from '../../components/layout/Banner'
-import LogoutModal from '../../components/layout/LogoutModal'
 import StatusTabs from '../../components/order/StatusTabs'
 import OrderList from '../../components/order/OrderList'
 import OrderDetail from '../../components/order/OrderDetail'
@@ -11,22 +8,55 @@ import NewOrderPopup from '../../components/order/NewOrderPopup'
 import RejectReasonModal from '../../components/order/RejectReasonModal'
 import Toast from '../../components/common/Toast'
 import { useOrderBoard } from '../../hooks/order/useOrderBoard'
-import { ACCEPT_DELAY_MINUTES } from '../../constants/order'
+import { useStoreOpen } from '../../hooks/store/useStoreOpen'
+import {
+  ACCEPT_DELAY_MINUTES,
+  AUTO_CANCEL_MINUTES,
+  AUTO_CANCEL_REASON,
+  BUSY_PENDING_COUNT,
+  ORDERS_PER_MINUTE_LIMIT,
+} from '../../constants/order'
+import { recommendCookMinutes } from '../../utils/cookTime'
 
-// OWN-02 ~ OWN-11: 주문판 한 화면에서 접수 → 조리 → 픽업까지 처리한다
+const mmss = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`
+
+// OWN-02 ~ OWN-11, OWN-24: 주문판 한 화면에서 접수 → 조리 → 픽업까지 처리한다
+// 상단 바·내비 바·로그아웃은 OwnerLayout 이 그린다
 export default function OrderBoardPage() {
-  const navigate = useNavigate()
   const board = useOrderBoard()
   const { actions, selectedOrder } = board
+  const { isOpen, setIsOpen } = useStoreOpen()
 
-  const [isOpen, setIsOpen] = useState(true)
   const [popupHidden, setPopupHidden] = useState(false)
   const [rejectTargetId, setRejectTargetId] = useState<number | null>(null)
-  const [showLogout, setShowLogout] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const closeToast = useCallback(() => setToast(null), [])
 
-  const delayed = board.pendingOrders.some((o) => o.elapsedMinutes >= ACCEPT_DELAY_MINUTES)
+  // 화면을 연 뒤 지난 초. 목업 주문의 경과 시간에 더해 자동 취소 카운트다운에 쓴다
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // 가장 오래 기다린 신규 주문 (자동 취소 대상)
+  const oldest = board.pendingOrders.reduce<(typeof board.pendingOrders)[number] | null>(
+    (a, o) => (a == null || o.elapsedMinutes > a.elapsedMinutes ? o : a),
+    null,
+  )
+  const waitedSec = oldest ? oldest.elapsedMinutes * 60 + tick : 0
+  const delayed = oldest != null && waitedSec >= ACCEPT_DELAY_MINUTES * 60
+  const remainSec = Math.max(0, AUTO_CANCEL_MINUTES * 60 - waitedSec)
+
+  // 접수 대기 시간을 넘기면 자동 취소·환불 (DUDU-67). 연동 후에는 서버가 처리하고 화면은 결과만 받는다
+  useEffect(() => {
+    if (!oldest || remainSec > 0) return
+    actions.reject(oldest.id, AUTO_CANCEL_REASON)
+    setToast(`#${oldest.displayNo} 주문이 자동 취소되고 고객에게 환불됐어요`)
+  }, [oldest, remainSec, actions])
+
+  const queued = board.orders.filter((o) => o.status === 'ACCEPTED' || o.status === 'COOKING').length
+  const recommendation = selectedOrder?.status === 'PENDING' ? recommendCookMinutes(selectedOrder, queued) : null
 
   const accept = (id: number, minutes: number) => {
     actions.accept(id, minutes)
@@ -42,7 +72,6 @@ export default function OrderBoardPage() {
 
   return (
     <div className="board">
-      <TopBar isOpen={isOpen} onToggleOpen={() => setIsOpen((v) => !v)} onLogout={() => setShowLogout(true)} />
       {!isOpen && (
         <Banner
           tone="muted"
@@ -51,7 +80,13 @@ export default function OrderBoardPage() {
           onAction={() => setIsOpen(true)}
         />
       )}
-      {isOpen && delayed && <Banner tone="warning" message="접수를 기다리는 주문이 있어요. 빨리 확인해 주세요" />}
+      {isOpen && delayed && oldest && (
+        <Banner
+          tone="warning"
+          message={`#${oldest.displayNo} 접수 대기 ${Math.floor(waitedSec / 60)}분째예요 · ${Math.ceil(remainSec / 60)}분 안에 접수하지 않으면 자동 취소되고 고객에게 환불돼요`}
+          trailing={<span className="countdown">{mmss(remainSec)} 남음</span>}
+        />
+      )}
 
       <div className="board-body">
         <aside className="board-left">
@@ -61,11 +96,17 @@ export default function OrderBoardPage() {
             selectedId={selectedOrder?.id ?? null}
             onSelect={board.setSelectedId}
           />
+          {board.pendingOrders.length >= BUSY_PENDING_COUNT && (
+            <p className="busy-note">
+              <span className="pill pill-yellow">주문 몰림 보호 · 1분에 {ORDERS_PER_MINUTE_LIMIT}건까지 접수</span>
+            </p>
+          )}
         </aside>
         <main className="board-right">
-          <OrderDetail order={selectedOrder} />
+          <OrderDetail order={selectedOrder} recommendation={recommendation} />
           <OrderActions
             order={selectedOrder}
+            recommendedMinutes={recommendation?.minutes}
             onAccept={(m) => selectedOrder && accept(selectedOrder.id, m)}
             onReject={() => selectedOrder && setRejectTargetId(selectedOrder.id)}
             onStartCooking={() => selectedOrder && (actions.startCooking(selectedOrder.id), board.follow(selectedOrder.id, 'COOKING'))}
@@ -90,7 +131,6 @@ export default function OrderBoardPage() {
         />
       )}
       {rejectTargetId != null && <RejectReasonModal onCancel={() => setRejectTargetId(null)} onConfirm={reject} />}
-      {showLogout && <LogoutModal onCancel={() => setShowLogout(false)} onConfirm={() => navigate('/login')} />}
       {toast && <Toast message={toast} onClose={closeToast} />}
     </div>
   )

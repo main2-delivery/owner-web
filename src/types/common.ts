@@ -11,3 +11,10 @@ export type OrderStatus =
   | 'DELIVERED' // 배달 완료
   | 'REJECTED' // 점주 거절
   | 'CANCELED' // 고객 취소
+
+// 백엔드 공통 응답 { success, data, error }
+export interface ApiResponse<T> {
+  success: boolean
+  data: T
+  error: { code: string; message: string } | null
+}

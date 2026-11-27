@@ -4,6 +4,7 @@ import { COOK_MINUTE_OPTIONS } from '../../constants/order'
 
 interface Props {
   order: Order | null
+  recommendedMinutes?: number
   onAccept: (minutes: number) => void
   onReject: () => void
   onStartCooking: () => void
@@ -13,7 +14,7 @@ interface Props {
 }
 
 // 주문서 아래 고정 버튼 영역. 상태마다 버튼이 다르다
-export default function OrderActions({ order, ...on }: Props) {
+export default function OrderActions({ order, recommendedMinutes, ...on }: Props) {
   if (!order) return <footer className="order-actions" />
 
   switch (order.status) {
@@ -21,7 +22,8 @@ export default function OrderActions({ order, ...on }: Props) {
       return (
         <footer className="order-actions">
           {COOK_MINUTE_OPTIONS.map((m) => (
-            <Button key={m} onClick={() => on.onAccept(m)}>
+            <Button key={m} className="has-badge" onClick={() => on.onAccept(m)}>
+              {m === recommendedMinutes && <span className="btn-badge">추천</span>}
               {m}분
             </Button>
           ))}

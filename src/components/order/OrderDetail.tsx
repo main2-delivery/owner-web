@@ -3,7 +3,12 @@ import StatusChip from '../common/StatusChip'
 import StatusHistoryBar from './StatusHistoryBar'
 import { formatWon } from '../../utils/format'
 
-export default function OrderDetail({ order }: { order: Order | null }) {
+interface Props {
+  order: Order | null
+  recommendation?: { minutes: number; reason: string } | null
+}
+
+export default function OrderDetail({ order, recommendation }: Props) {
   if (!order) {
     return (
       <section className="order-detail empty">
@@ -74,7 +79,15 @@ export default function OrderDetail({ order }: { order: Order | null }) {
         <span className="muted">배달 주소</span> {order.deliveryAddress}
       </p>
 
-      <StatusHistoryBar history={order.history} />
+      {/* 접수 전에는 이력이 '주문' 하나뿐이라, 그 자리에 조리 시간 추천을 보여 준다 (OWN-24) */}
+      {order.status === 'PENDING' && recommendation ? (
+        <p className="recommend">
+          <span className="pill pill-solid-blue">추천 {recommendation.minutes}분</span>
+          {recommendation.reason}
+        </p>
+      ) : (
+        <StatusHistoryBar history={order.history} />
+      )}
     </section>
   )
 }

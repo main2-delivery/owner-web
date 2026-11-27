@@ -24,19 +24,33 @@
 `.env.local`의 `VITE_TEST_USER_ID`, `VITE_TEST_ROLE` 값이 백엔드의 `X-Test-User-Id`, `X-Test-Role` 헤더로 자동으로 붙는다.
 
 ## 화면
-디자인: Figma `점주 웹` 페이지 (OWN-01 ~ OWN-11)
+디자인: Figma `점주 웹` 페이지 (OWN-01 ~ OWN-24)
 
-| 경로 | 화면 | 디자인 |
-|---|---|---|
-| `/login` | 로그인 | OWN-01 |
-| `/orders` | 주문판 (신규 팝업, 접수, 거절, 조리, 픽업, 영업 상태, 로그아웃) | OWN-02 ~ OWN-11 |
+로그인 뒤 화면은 모두 `components/layout/OwnerLayout.tsx`(상단 바 + 내비 바) 안에 그린다.
+
+| 경로 | 화면 | 디자인 | Jira |
+|---|---|---|---|
+| `/login` | 로그인 | OWN-01 | |
+| `/orders` | 주문판 (신규 팝업, 접수, 거절, 조리, 픽업, 영업 상태, 자동 취소 카운트다운, 조리 시간 추천) | OWN-02 ~ OWN-11, OWN-24 | 51, 67, 68, 43 |
+| `/store/apply` | 입점 신청 → 심사 중 | OWN-12 | 49, 17 |
+| `/store` | 가게 정보 | OWN-13 | 49, 17, 18 |
+| `/store/hours` | 영업시간·브레이크·휴무, 자동 전환 | OWN-14 | 66 |
+| `/menus` | 메뉴 목록 (대표·품절·숨김, 한정 수량 모달) | OWN-15, OWN-16 | 50, 15, 27, 64 |
+| `/menus/new`, `/menus/:menuId` | 메뉴 등록·수정 + 고객 앱 미리보기 | OWN-16 | 50, 15, 16 |
+| `/reviews`, `/reviews/:reviewId` | 리뷰 목록, 답글 작성 | OWN-17, OWN-18 | 55, 29 |
+| `/sales`, `/sales/orders` | 오늘 요약, 주문 내역 | OWN-19, OWN-20 | 51, 31 |
+| `/inventory`, `/inventory/stocktake`, `/inventory/purchase` | 재고 현황, 실사 보정, 발주 제안 | OWN-21 ~ OWN-23 | 52, 36, 65, 42 |
 
 주문판 상태 탭과 백엔드 `OrderStatus` 매핑은 `src/constants/order.ts`에 있다.
-지금은 `src/mocks/` 목업 데이터로 동작한다. 백엔드 연동 시 `hooks/order/useOrderBoard.ts`의 각 동작을 `api/order` 호출로 바꾼다.
+
+### 목업과 백엔드 연동
+- 지금은 모든 화면이 `src/mocks/` 목업으로 동작한다. 여러 화면이 같은 목업을 고치고 보도록 `utils/mockStore.ts`를 쓴다 (예: 메뉴 수정 후 목록에 반영).
+- 백엔드에 이미 있는 API는 호출 함수만 만들어 두었다: `api/store/storeApi.ts`(입점·가게 조회·수정), `api/menu/menuApi.ts`(메뉴 CRUD). 연동할 때 `hooks/store`, `hooks/menu`의 목업 갱신을 이 함수 호출로 바꾼다.
+- 주문 API, 리뷰, 매출, 영업시간, 한정 수량, 재고·발주는 백엔드가 아직 없다. 타입(`types/*.ts`)에 화면이 기대하는 필드를 적어 두었다.
 
 ## 폴더 규칙
 백엔드처럼 계층 먼저, 그 안에서 기능 폴더로 나눈다.
-기능: `auth`(로그인), `order`(주문판), `store`(가게·영업 상태), `menu`, `review`, `image`
+기능: `auth`(로그인), `order`(주문판), `store`(가게·영업 상태·영업시간), `menu`, `review`, `sales`(오늘 요약·주문 내역), `inventory`(재고·발주), `image`
 
 ```
 src/
@@ -44,8 +58,8 @@ src/
 ├── hooks/      화면에서 쓰는 훅           hooks/order/useOrderBoard.ts
 ├── pages/      라우트 하나당 화면 하나     pages/order/OrderBoardPage.tsx
 ├── components/ 화면 조각                 components/order/OrderDetail.tsx
-│   ├── common/   버튼·상태 칩·모달·토스트 등 공통 부품
-│   └── layout/   상단 바, 띠 배너, 로그아웃 모달
+│   ├── common/   버튼·상태 칩·모달·토스트·토글·알약 등 공통 부품
+│   └── layout/   공통 틀(OwnerLayout), 상단 바, 내비 바, 띠 배너, 로그아웃 모달
 ├── constants/  상태 탭, 거절 사유 등 고정 값
 ├── mocks/      백엔드 연동 전 목업 데이터
 ├── types/      요청·응답 타입              types/order.ts, common.ts(백엔드 enum)

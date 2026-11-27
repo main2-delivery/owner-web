@@ -29,3 +29,11 @@ export const REJECT_REASONS = ['재료 소진', '영업 종료', '배달 불가 
 
 // 신규 주문이 이 시간(분) 넘게 접수되지 않으면 접수 지연 띠 배너를 띄운다
 export const ACCEPT_DELAY_MINUTES = 5
+
+// 신규 주문이 이 시간(분) 넘게 접수되지 않으면 자동 취소·환불된다 (DUDU-67)
+export const AUTO_CANCEL_MINUTES = 10
+export const AUTO_CANCEL_REASON = '접수 대기 시간 초과 (자동 취소)'
+
+// 주문 몰림 보호: 1분에 받는 신규 주문 수 (토큰 버킷, DUDU-43). 신규 주문이 이만큼 쌓이면 안내를 띄운다
+export const ORDERS_PER_MINUTE_LIMIT = 4
+export const BUSY_PENDING_COUNT = 2
