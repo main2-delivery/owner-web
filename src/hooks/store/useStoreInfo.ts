@@ -1,9 +1,10 @@
 import { createMockStore, useMockStore } from '../../utils/mockStore'
-import { MOCK_BUSINESS_HOURS, MOCK_HOLIDAYS, MOCK_STORE_DETAIL } from '../../mocks/store'
+import { storeApi } from '../../api/store/storeApi'
+import { MOCK_BUSINESS_HOURS, MOCK_HOLIDAYS } from '../../mocks/store'
+import { useCurrentStore } from './useCurrentStore'
 import type { BusinessHour, Holiday, StoreCreateRequest, StoreDetail } from '../../types/store'
 
-// 가게 정보·영업시간. 지금은 목업. 연동 시 storeApi.getStore / updateStore / apply 로 바꾼다
-const storeDetail = createMockStore<StoreDetail>(MOCK_STORE_DETAIL)
+// 가게 정보는 owner-server(storeApi)와 연동한다. 영업시간·휴무일·입점 신청은 아직 목업
 const hours = createMockStore<BusinessHour[]>(MOCK_BUSINESS_HOURS)
 const holidays = createMockStore<Holiday[]>(MOCK_HOLIDAYS)
 const autoSwitch = createMockStore(true)
@@ -11,9 +12,25 @@ const autoSwitch = createMockStore(true)
 const application = createMockStore<(StoreCreateRequest & { appliedAt: string }) | null>(null)
 
 export function useStoreInfo() {
+  const { source, store, setStore } = useCurrentStore()
   return {
-    store: useMockStore(storeDetail),
-    save: (next: StoreDetail) => storeDetail.set(next),
+    source,
+    store,
+    // 서버에 없는 값(소개·포장 할인)은 화면에만 남긴다
+    save: async (next: StoreDetail) => {
+      if (source !== 'api') return setStore(next)
+      const saved = await storeApi.updateStore(next.storeId, {
+        phone: next.phone ?? '',
+        openTime: next.openTime,
+        closeTime: next.closeTime,
+        minOrderAmount: next.minOrderAmount,
+        deliveryFee: next.deliveryFee,
+        deliveryRadiusM: next.deliveryRadiusM,
+        // blob: 미리보기 주소는 서버에 보내지 않는다 (이미지 업로드 API 전)
+        logoUrl: next.logoUrl?.startsWith('blob:') ? store.logoUrl : next.logoUrl,
+      })
+      setStore({ ...next, ...saved })
+    },
   }
 }
 

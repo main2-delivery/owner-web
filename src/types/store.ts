@@ -5,14 +5,14 @@ export interface StoreDetail {
   name: string
   categoryId: number | null
   categoryName: string | null
-  phone: string
-  businessNumber: string
+  phone: string | null // 수집 가게는 비어 있을 수 있다
+  businessNumber: string | null
   address: string
   minOrderAmount: number
   deliveryFee: number
   deliveryRadiusM: number
-  openTime: string // HH:mm
-  closeTime: string
+  openTime: string | null // HH:mm:ss, 수집 가게는 null
+  closeTime: string | null
   status: string // PENDING(심사 중) · OPEN · CLOSED ...
   logoUrl: string | null
   // 아래는 백엔드에 아직 없는 화면 전용 값
@@ -30,8 +30,8 @@ export interface StoreCreateRequest {
 
 export interface StoreUpdateRequest {
   phone: string
-  openTime: string
-  closeTime: string
+  openTime: string | null
+  closeTime: string | null
   minOrderAmount: number
   deliveryFee: number
   deliveryRadiusM: number

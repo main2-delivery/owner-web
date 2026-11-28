@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import PageHeader from '../../components/common/PageHeader'
 import TextField from '../../components/common/TextField'
@@ -10,21 +10,24 @@ import ImagePicker from '../../components/common/ImagePicker'
 import MenuPreview from '../../components/menu/MenuPreview'
 import DailyLimitModal from '../../components/menu/DailyLimitModal'
 import { useMenus } from '../../hooks/menu/useMenus'
-import { MENU_CATEGORIES } from '../../mocks/menus'
+import Toast from '../../components/common/Toast'
+import { apiErrorMessage } from '../../utils/apiError'
 import type { Menu } from '../../types/menu'
 
 // OWN-16: 메뉴 등록(/menus/new)·수정(/menus/:menuId). 연동 시 menuApi.create / update / remove
 export default function MenuFormPage() {
   const { menuId } = useParams()
-  const { find, save, remove, nextId } = useMenus()
+  const { find, save, remove, nextId, categories, loading } = useMenus()
   const isNew = menuId == null
   const existing = isNew ? undefined : find(Number(menuId))
+  if (!isNew && loading) return <div className="page center muted">메뉴를 불러오는 중이에요</div>
   if (!isNew && !existing) return <Navigate to="/menus" replace />
   return (
     <MenuForm
       key={menuId ?? 'new'}
-      initial={existing ?? { menuId: nextId(), name: '', description: '', price: null, imageUrl: null, soldOut: false, hidden: false, representative: false, category: MENU_CATEGORIES[0], dailyLimit: null }}
+      initial={existing ?? { menuId: nextId(), name: '', description: '', price: null, imageUrl: null, soldOut: false, hidden: false, representative: false, category: categories[0], dailyLimit: null }}
       isNew={isNew}
+      categories={categories}
       onSave={save}
       onRemove={remove}
     />
@@ -34,16 +37,33 @@ export default function MenuFormPage() {
 interface FormProps {
   initial: Menu
   isNew: boolean
-  onSave: (menu: Menu) => void
-  onRemove: (menuId: number) => void
+  categories: string[]
+  onSave: (menu: Menu) => Promise<void>
+  onRemove: (menuId: number) => Promise<void>
 }
 
-function MenuForm({ initial, isNew, onSave, onRemove }: FormProps) {
+function MenuForm({ initial, isNew, categories, onSave, onRemove }: FormProps) {
   const navigate = useNavigate()
   const [menu, setMenu] = useState(initial)
   const [submitted, setSubmitted] = useState(false)
   const [showLimit, setShowLimit] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const closeError = useCallback(() => setError(null), [])
+  // 서버 저장·삭제가 끝나면 목록으로 돌아가고, 실패하면 문구를 띄운다
+  const run = async (action: () => Promise<void>, fallback: string) => {
+    setBusy(true)
+    try {
+      await action()
+      navigate('/menus')
+    } catch (e) {
+      setError(apiErrorMessage(e, fallback))
+      setConfirmDelete(false)
+    } finally {
+      setBusy(false)
+    }
+  }
   const set = (patch: Partial<Menu>) => setMenu((m) => ({ ...m, ...patch }))
 
   const nameError = !menu.name.trim() ? '메뉴 이름을 입력해 주세요' : menu.name.length > 100 ? '100자 이하로 입력해 주세요' : undefined
@@ -52,8 +72,7 @@ function MenuForm({ initial, isNew, onSave, onRemove }: FormProps) {
   const submit = () => {
     setSubmitted(true)
     if (nameError || priceError) return
-    onSave({ ...menu, name: menu.name.trim() })
-    navigate('/menus')
+    void run(() => onSave({ ...menu, name: menu.name.trim() }), '메뉴를 저장하지 못했어요')
   }
 
   return (
@@ -67,7 +86,9 @@ function MenuForm({ initial, isNew, onSave, onRemove }: FormProps) {
         <Button variant="secondary" onClick={() => navigate('/menus')}>
           취소
         </Button>
-        <Button onClick={submit}>저장</Button>
+        <Button onClick={submit} disabled={busy}>
+          저장
+        </Button>
       </PageHeader>
       <div className="row grow-y">
         <section className="card grow">
@@ -77,14 +98,16 @@ function MenuForm({ initial, isNew, onSave, onRemove }: FormProps) {
             </div>
             <div className="form-grid cols-2 grow">
               <TextField label="메뉴 이름" value={menu.name} maxLength={100} onChange={(e) => set({ name: e.target.value })} error={submitted ? nameError : undefined} />
-              <label className="field">
-                <span>카테고리</span>
-                <select className="input" value={menu.category} onChange={(e) => set({ category: e.target.value })}>
-                  {MENU_CATEGORIES.map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
-                </select>
-              </label>
+              {categories.length > 0 && (
+                <label className="field">
+                  <span>카테고리</span>
+                  <select className="input" value={menu.category} onChange={(e) => set({ category: e.target.value })}>
+                    {categories.map((c) => (
+                      <option key={c}>{c}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <TextField
                 label="가격"
                 suffix="원"
@@ -131,6 +154,7 @@ function MenuForm({ initial, isNew, onSave, onRemove }: FormProps) {
           }}
         />
       )}
+      {error && <Toast message={error} onClose={closeError} />}
       {confirmDelete && (
         <Modal>
           <h3 className="modal-title">'{initial.name}' 메뉴를 삭제할까요?</h3>
@@ -141,10 +165,8 @@ function MenuForm({ initial, isNew, onSave, onRemove }: FormProps) {
             </Button>
             <Button
               variant="danger"
-              onClick={() => {
-                onRemove(initial.menuId)
-                navigate('/menus')
-              }}
+              disabled={busy}
+              onClick={() => void run(() => onRemove(initial.menuId), '메뉴를 삭제하지 못했어요')}
             >
               삭제
             </Button>

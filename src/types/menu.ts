@@ -14,6 +14,8 @@ export interface Menu {
   dailyLimit?: DailyLimit | null // 오늘 한정 수량 (DUDU-64)
 }
 
+export type MenuFlag = 'soldOut' | 'hidden' | 'representative'
+
 export interface DailyLimit {
   quantity: number
   sold: number

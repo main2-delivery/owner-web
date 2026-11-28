@@ -1,18 +1,28 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import PageHeader from '../../components/common/PageHeader'
 import Button from '../../components/common/Button'
 import Toggle from '../../components/common/Toggle'
 import Pill from '../../components/common/Pill'
 import DailyLimitModal from '../../components/menu/DailyLimitModal'
+import Toast from '../../components/common/Toast'
+import { apiErrorMessage } from '../../utils/apiError'
+import type { MenuFlag } from '../../types/menu'
 import { useMenus } from '../../hooks/menu/useMenus'
-import { MENU_CATEGORIES } from '../../mocks/menus'
 import { formatWon } from '../../utils/format'
 
 // OWN-15: 메뉴 목록. 대표·품절·숨김은 바로 저장되고 고객 앱에 반영된다 (DUDU-15, 27)
 export default function MenuListPage() {
   const navigate = useNavigate()
-  const { menus, toggle, find, setDailyLimit } = useMenus()
+  const { menus, categories, loading, toggle, copy, find, setDailyLimit } = useMenus()
+  const [toast, setToast] = useState<string | null>(null)
+  const closeToast = useCallback(() => setToast(null), [])
+  const flip = (menuId: number, flag: MenuFlag) =>
+    toggle(menuId, flag).catch((e) => setToast(apiErrorMessage(e, '바꾸지 못했어요. 잠시 후 다시 시도해 주세요')))
+  const duplicate = (menuId: number, name: string) =>
+    copy(menuId)
+      .then(() => setToast(`'${name}' 메뉴를 복사했어요`))
+      .catch((e) => setToast(apiErrorMessage(e, '복사하지 못했어요')))
   const [category, setCategory] = useState<string | null>(null)
   const [keyword, setKeyword] = useState('')
   const [limitMenuId, setLimitMenuId] = useState<number | null>(null)
@@ -37,7 +47,7 @@ export default function MenuListPage() {
       <div className="row grow-y">
         <nav className="card w-220 category-list" aria-label="카테고리">
           <span className="muted strong">카테고리</span>
-          {[null, ...MENU_CATEGORIES].map((c) => (
+          {[null, ...categories].map((c) => (
             <button key={c ?? 'all'} type="button" className={category === c ? 'active' : ''} onClick={() => setCategory(c)}>
               <span>{c ?? '전체'}</span>
               <span className="muted">{c ? menus.filter((m) => m.category === c).length : menus.length}</span>
@@ -57,6 +67,13 @@ export default function MenuListPage() {
               </tr>
             </thead>
             <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={6} className="muted">
+                    메뉴를 불러오는 중이에요
+                  </td>
+                </tr>
+              )}
               {visible.map((m) => (
                 <tr key={m.menuId}>
                   <td>
@@ -81,18 +98,23 @@ export default function MenuListPage() {
                   </td>
                   <td className="price">{m.price != null ? formatWon(m.price) : '—'}</td>
                   <td>
-                    <Toggle label={`${m.name} 대표`} checked={m.representative} onChange={() => toggle(m.menuId, 'representative')} />
+                    <Toggle label={`${m.name} 대표`} checked={m.representative} onChange={() => flip(m.menuId, 'representative')} />
                   </td>
                   <td>
-                    <Toggle label={`${m.name} 품절`} checked={m.soldOut} onChange={() => toggle(m.menuId, 'soldOut')} />
+                    <Toggle label={`${m.name} 품절`} checked={m.soldOut} onChange={() => flip(m.menuId, 'soldOut')} />
                   </td>
                   <td>
-                    <Toggle label={`${m.name} 숨김`} checked={m.hidden} onChange={() => toggle(m.menuId, 'hidden')} />
+                    <Toggle label={`${m.name} 숨김`} checked={m.hidden} onChange={() => flip(m.menuId, 'hidden')} />
                   </td>
                   <td>
-                    <Link className="text-link" to={`/menus/${m.menuId}`}>
-                      수정
-                    </Link>
+                    <div className="inline">
+                      <Link className="text-link" to={`/menus/${m.menuId}`}>
+                        수정
+                      </Link>
+                      <button type="button" className="text-link" onClick={() => duplicate(m.menuId, m.name)}>
+                        복사
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -107,6 +129,7 @@ export default function MenuListPage() {
           </table>
         </section>
       </div>
+      {toast && <Toast message={toast} onClose={closeToast} />}
       {limitMenu && (
         <DailyLimitModal
           menu={limitMenu}
